@@ -1,0 +1,52 @@
+CREATE OR REPLACE PROCEDURE actor_info(looking_for_name TEXT)
+AS
+$$
+DECLARE
+    person_for_id INTEGER;
+    actor_age INTEGER;
+    nicknames TEXT;
+    first_movie TEXT;
+    first_movie_year INTEGER;
+BEGIN
+    -- Получаем ID актера
+    SELECT id INTO person_for_id
+    FROM name
+    WHERE name = looking_for_name
+    LIMIT 1;
+
+    -- Если актер не найден, завершаем с ошибкой
+    IF person_for_id IS NULL THEN
+        RAISE EXCEPTION 'Invalid data: Actor not found';
+    END IF;
+
+    -- Получаем прозвища (info_type_id = 35 - Nickname)
+    SELECT STRING_AGG(info, ', ') INTO nicknames
+    FROM person_info
+    WHERE person_id = person_for_id AND info_type_id = 35;
+
+    -- Получаем возраст через ранее созданную функцию
+    actor_age := sum_of_years(looking_for_name);
+
+    -- Получаем первый фильм и год выхода
+    SELECT t.title, t.production_year INTO first_movie, first_movie_year
+    FROM cast_info ci
+    JOIN title t ON ci.movie_id = t.id
+    WHERE ci.person_id = person_for_id
+    ORDER BY t.production_year ASC
+    LIMIT 1;
+
+    -- Если первая роль не найдена, выбрасываем ошибку
+    IF first_movie IS NULL OR first_movie_year IS NULL THEN
+        RAISE EXCEPTION 'Invalid data: First appearance not found';
+    END IF;
+
+    -- Вывод информации
+    RAISE NOTICE 'Name: %', looking_for_name;
+    IF nicknames IS NOT NULL THEN
+        RAISE NOTICE 'Nicknames: %', nicknames;
+    END IF;
+    RAISE NOTICE 'Age: %', actor_age;
+    RAISE NOTICE 'First appear: %, %', first_movie, first_movie_year;
+    
+END;
+$$ LANGUAGE plpgsql;
